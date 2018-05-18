@@ -1,0 +1,41 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:compass"
+             x:Class="compass.MainPage">
+
+    <ContentPage.BindingContext>
+        <local:CompassViewModel/>
+    </ContentPage.BindingContext>
+    
+    <StackLayout
+        VerticalOptions="FillAndExpand"
+        Spacing="10">
+
+        <Label
+            Text="hello world, compass"
+            HorizontalOptions="Center" />
+
+        <Label
+            Text="{Binding HeadingDisplay}" 
+            x:Name="LabelHeading"
+            HorizontalOptions="Center" />
+
+        <Label
+            Text="{Binding AccelerometerDisplay}"
+            x:Name="LabelAccelerometer"
+            HorizontalOptions="Center" />
+
+        <Label
+            Text="{Binding GyroscopeDisplay}"
+            x:Name="LabelGyroscope"
+            HorizontalOptions="Center" />
+
+        <Label
+            Text="{Binding MagnetometerDisplay}"
+            x:Name="LabelMagnetometer"
+            HorizontalOptions="Center" />
+
+    </StackLayout>
+
+</ContentPage>
