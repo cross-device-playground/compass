@@ -13,7 +13,7 @@
         Spacing="10">
 
         <Label
-            Text="hello world, compass"
+            Text="hello world, compass-v2"
             HorizontalOptions="Center" />
 
         <Label

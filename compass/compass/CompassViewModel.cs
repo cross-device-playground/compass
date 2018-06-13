@@ -18,24 +18,27 @@ namespace compass
         }
 
         // mobile device sensor data
-        public struct MobileSensorData
+        public struct MobileSensingData
         {
             public string ID { get; set; }
+            public string DeviceName { get; set; }
+            public long Timestamp { get; set; }
             public float Compass { get; set; }
-            public float AccelerometerX { get; set; }
-            public float AccelerometerY { get; set; }
-            public float AccelerometerZ { get; set; }
-            public float GyroscopeX { get; set; }
-            public float GyroscopeY { get; set; }
-            public float GyroscopeZ { get; set; }
-            public float MagnetometerX { get; set; }
-            public float MagnetometerY { get; set; }
-            public float MagnetometerZ { get; set; }
+            public float Accelerometer_x { get; set; }
+            public float Accelerometer_y { get; set; }
+            public float Accelerometer_z { get; set; }
+            public float Gyroscope_x { get; set; }
+            public float Gyroscope_y { get; set; }
+            public float Gyroscope_z { get; set; }
+            public float Magnetometer_x { get; set; }
+            public float Magnetometer_y { get; set; }
+            public float Magnetometer_z { get; set; }
         }
 
-        private List<MobileSensorData> _mobileSensorDataStore = new List<MobileSensorData> { };
-        private HttpClient _mobileSensorRESTClient = new HttpClient();
-        private string _mobileSensorRESTAddress = "0.0.0.0:5566/mobile/sensor";
+        MobileSensingData _sensingData = new MobileSensingData();
+        private readonly object _sensingDataLock = new object();
+        private HttpClient _deviceRESTClient = new HttpClient();
+        private string _remoteRESTAddress = "http://10.42.0.1:5566/mobile/sensing/";
 
         public Command StopCommand { get; }
 
@@ -70,6 +73,9 @@ namespace compass
 
         void Start()
         {
+            this._sensingData.ID = "charlie";
+            this._sensingData.DeviceName = DeviceInfo.Name;
+
             if (!Compass.IsMonitoring)
             {
                 Compass.ReadingChanged += Compass_ReadingChanged;
@@ -97,70 +103,68 @@ namespace compass
 
         private void Compass_ReadingChanged(CompassChangedEventArgs e)
         {
-            HeadingDisplay = $"Compass: {e.Reading.HeadingMagneticNorth:F3}";
-            MobileSensorData data = new MobileSensorData
+            //HeadingDisplay = $"Compass: {e.Reading.HeadingMagneticNorth:F3}";
+            lock (_sensingDataLock)
             {
-                Compass = (float) e.Reading.HeadingMagneticNorth
-            };
-            this._mobileSensorDataStore.Add(data);
+                _sensingData.Timestamp = DateTime.UtcNow.Ticks;
+                _sensingData.Compass = (float) e.Reading.HeadingMagneticNorth;
+            }
         }
 
         private void Accelerometer_ReadingChanged(AccelerometerChangedEventArgs e)
         {
-            AccelerometerDisplay = $"Acceleromter: {e.Reading.Acceleration.X:F3}, {e.Reading.Acceleration.Y:F3}, {e.Reading.Acceleration.Z:F3}";
-            MobileSensorData data = new MobileSensorData
+            //AccelerometerDisplay = $"Acceleromter: {e.Reading.Acceleration.X:F3}, {e.Reading.Acceleration.Y:F3}, {e.Reading.Acceleration.Z:F3}";
+            lock(_sensingDataLock)
             {
-                AccelerometerX = e.Reading.Acceleration.X,
-                AccelerometerY = e.Reading.Acceleration.Y,
-                AccelerometerZ = e.Reading.Acceleration.Z
-            };
-            this._mobileSensorDataStore.Add(data);
-
-            // hack
-            //POST_SENSOR_DATA();
+                _sensingData.Timestamp = DateTime.UtcNow.Ticks;
+                _sensingData.Accelerometer_x = e.Reading.Acceleration.X;
+                _sensingData.Accelerometer_y = e.Reading.Acceleration.Y;
+                _sensingData.Accelerometer_z = e.Reading.Acceleration.Z;
+                // hack - do POST only when accelerometer updates
+                POST_Sensing_Data();
+            }
         }
 
         private void Gyroscope_ReadingChanged(GyroscopeChangedEventArgs e)
         {
-            GyroscopeDisplay = $"Gyroscope: {e.Reading.AngularVelocity.X:F3}, {e.Reading.AngularVelocity.Y:F3}, {e.Reading.AngularVelocity.Z:F3}";
-            MobileSensorData data = new MobileSensorData
+            //GyroscopeDisplay = $"Gyroscope: {e.Reading.AngularVelocity.X:F3}, {e.Reading.AngularVelocity.Y:F3}, {e.Reading.AngularVelocity.Z:F3}";
+            lock (_sensingDataLock)
             {
-                GyroscopeX = e.Reading.AngularVelocity.X,
-                GyroscopeY = e.Reading.AngularVelocity.Y,
-                GyroscopeZ = e.Reading.AngularVelocity.Z
-            };
-            this._mobileSensorDataStore.Add(data);
+                _sensingData.Timestamp = DateTime.UtcNow.Ticks;
+                _sensingData.Gyroscope_x = e.Reading.AngularVelocity.X;
+                _sensingData.Gyroscope_y = e.Reading.AngularVelocity.Y;
+                _sensingData.Gyroscope_z = e.Reading.AngularVelocity.Z;
+            }
         }
 
         private void Magnetometer_ReadingChanged(MagnetometerChangedEventArgs e)
         {
-            MagnetometerDisplay = $"Magnetometer: {e.Reading.MagneticField.X:F3}, {e.Reading.MagneticField.Y:F3}, {e.Reading.MagneticField.Z:F3}";
-            MobileSensorData data = new MobileSensorData
+            //MagnetometerDisplay = $"Magnetometer: {e.Reading.MagneticField.X:F3}, {e.Reading.MagneticField.Y:F3}, {e.Reading.MagneticField.Z:F3}";
+            lock (_sensingDataLock)
             {
-                MagnetometerX = e.Reading.MagneticField.X,
-                MagnetometerY = e.Reading.MagneticField.Y,
-                MagnetometerZ = e.Reading.MagneticField.Z
-            };
-            this._mobileSensorDataStore.Add(data);
+                _sensingData.Timestamp = DateTime.UtcNow.Ticks;
+                _sensingData.Magnetometer_x = e.Reading.MagneticField.X;
+                _sensingData.Magnetometer_y = e.Reading.MagneticField.Y;
+                _sensingData.Magnetometer_z = e.Reading.MagneticField.Z;
+            }
         }
 
-        // POST mobile device sensor data
-        private async void POST_SENSOR_DATA()
+        // POST mobile device sensing data
+        private async void POST_Sensing_Data()
         {
             try
             {
-                var json = JsonConvert.SerializeObject(this._mobileSensorDataStore[0]);
+                var json = JsonConvert.SerializeObject(this._sensingData);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                HttpResponseMessage response = await this._mobileSensorRESTClient.PostAsync(this._mobileSensorRESTAddress, content);
-
+                HttpResponseMessage response = await this._deviceRESTClient.PostAsync(this._remoteRESTAddress, content);
                 if (response.IsSuccessStatusCode)
                 {
-                    Debug.WriteLine(@"POST SUCCESS!");
+                    Debug.WriteLine("POST success!");
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(@"ERROR {0}!", ex.Message);
+                Debug.WriteLine(String.Format("POST error {0}!", ex.Message));
             }
         }
 
