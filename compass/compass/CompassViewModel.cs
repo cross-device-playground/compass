@@ -11,6 +11,7 @@ namespace compass
 {
     public class CompassViewModel : MvvmHelpers.BaseViewModel
     {
+
         public CompassViewModel()
         {
             this.StopCommand = new Command(Stop);
@@ -20,19 +21,22 @@ namespace compass
         // mobile device sensor data
         public struct MobileSensingData
         {
-            public string ID { get; set; }
-            public string DeviceName { get; set; }
-            public long Timestamp { get; set; }
-            public float Compass { get; set; }
-            public float Accelerometer_x { get; set; }
-            public float Accelerometer_y { get; set; }
-            public float Accelerometer_z { get; set; }
-            public float Gyroscope_x { get; set; }
-            public float Gyroscope_y { get; set; }
-            public float Gyroscope_z { get; set; }
-            public float Magnetometer_x { get; set; }
-            public float Magnetometer_y { get; set; }
-            public float Magnetometer_z { get; set; }
+            public string ID;
+            public string DeviceName;
+            public double Timestamp;
+            public float Compass;
+            public float Accelerometer_x;
+            public float Accelerometer_y;
+            public float Accelerometer_z;
+            public float LinearAccelerometer_x;
+            public float LinearAccelerometer_y;
+            public float LinearAccelerometer_z;
+            public float Gyroscope_x;
+            public float Gyroscope_y;
+            public float Gyroscope_z;
+            public float Magnetometer_x;
+            public float Magnetometer_y;
+            public float Magnetometer_z;
         }
 
         MobileSensingData _sensingData = new MobileSensingData();
@@ -41,6 +45,7 @@ namespace compass
         private string _remoteRESTAddress = "http://10.42.0.1:5566/mobile/sensing/";
 
         public Command StopCommand { get; }
+
 
         void Stop()
         {
@@ -52,7 +57,7 @@ namespace compass
 
             if (Accelerometer.IsMonitoring)
             {
-                Accelerometer.ReadingChanged -= Accelerometer_ReadingChanged;
+                Accelerometer.ReadingChanged -= Accelerometer_Essentials_ReadingChanged;
                 Accelerometer.Stop();
             }
 
@@ -66,6 +71,12 @@ namespace compass
             {
                 Magnetometer.ReadingChanged -= Magnetometer_ReadingChanged;
                 Magnetometer.Stop();
+            }
+
+            // device-specific sensor readings
+            if (Device.RuntimePlatform.Equals((Device.Android)))
+            {
+                MessagingCenter.Unsubscribe<Sensors.Android.LinearAcceleration>(this, Sensors.Android.SubscriberMessage.LinearAcceleration);
             }
         }
 
@@ -84,7 +95,7 @@ namespace compass
 
             if (!Accelerometer.IsMonitoring)
             {
-                Accelerometer.ReadingChanged += Accelerometer_ReadingChanged;
+                Accelerometer.ReadingChanged += Accelerometer_Essentials_ReadingChanged;
                 Accelerometer.Start(SensorSpeed.Fastest);
             }
 
@@ -99,6 +110,15 @@ namespace compass
                 Magnetometer.ReadingChanged += Magnetometer_ReadingChanged;
                 Magnetometer.Start(SensorSpeed.Fastest);
             }
+
+            // device-specific sensor readings
+            if (Device.RuntimePlatform.Equals((Device.Android)))
+            {
+                MessagingCenter.Subscribe<Sensors.Android.LinearAcceleration>(this, Sensors.Android.SubscriberMessage.LinearAcceleration, (linear_acceleration) =>
+                {
+                    this.LinearAccelerometer_Android_ReadingChanged(linear_acceleration);
+                });
+            }
         }
 
         private void Compass_ReadingChanged(CompassChangedEventArgs e)
@@ -107,21 +127,36 @@ namespace compass
             lock (_sensingDataLock)
             {
                 _sensingData.Timestamp = DateTime.UtcNow.Ticks;
-                _sensingData.Compass = (float) e.Reading.HeadingMagneticNorth;
+                _sensingData.Compass = (float)e.Reading.HeadingMagneticNorth;
             }
         }
 
-        private void Accelerometer_ReadingChanged(AccelerometerChangedEventArgs e)
+        private void LinearAccelerometer_Android_ReadingChanged(Sensors.Android.LinearAcceleration data)
+        {
+            lock (_sensingDataLock)
+            {
+                _sensingData.Timestamp = DateTime.UtcNow.Ticks / (double)(TimeSpan.TicksPerSecond);
+                _sensingData.LinearAccelerometer_x = data.x;
+                _sensingData.LinearAccelerometer_y = data.y;
+                _sensingData.LinearAccelerometer_z = data.z;
+
+                // hack
+                POST_Sensing_Data();
+            }
+        }
+
+        private void Accelerometer_Essentials_ReadingChanged(AccelerometerChangedEventArgs e)
         {
             //AccelerometerDisplay = $"Acceleromter: {e.Reading.Acceleration.X:F3}, {e.Reading.Acceleration.Y:F3}, {e.Reading.Acceleration.Z:F3}";
-            lock(_sensingDataLock)
+            lock (_sensingDataLock)
             {
-                _sensingData.Timestamp = DateTime.UtcNow.Ticks;
+                _sensingData.Timestamp = DateTime.UtcNow.Ticks / TimeSpan.TicksPerSecond;
                 _sensingData.Accelerometer_x = e.Reading.Acceleration.X;
                 _sensingData.Accelerometer_y = e.Reading.Acceleration.Y;
                 _sensingData.Accelerometer_z = e.Reading.Acceleration.Z;
-                // hack - do POST only when accelerometer updates
-                POST_Sensing_Data();
+
+                // hack
+                //POST_Sensing_Data();
             }
         }
 
